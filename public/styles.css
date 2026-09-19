@@ -922,9 +922,18 @@ section {
   .hero, .blob { translate: none !important; }
 }
 
-/* browsers without backdrop-filter: make the glass a little more solid */
+/* browsers without backdrop-filter: make the glass a little more solid.
+   The gradient buttons and the tinted title tiles keep their own colours,
+   only more opaque: painting them white would hide their white text. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass, .btn, .vent__box { background: var(--sheen), rgba(255,255,255,.86); }
-  .ransom .word > span { background-color: rgba(255,255,255,.92); }
+  .glass, .btn:not(.btn--big):not(.btn--burn), .vent__box { background: var(--sheen), rgba(255,255,255,.86); }
+  .ransom .word > span.c-kw { background: var(--sheen), rgba(27,22,38,.92); }
+  .ransom .word > span.c-yk { background: var(--sheen), rgba(255,227,110,.92); }
+  .ransom .word > span.c-wk { background: var(--sheen), rgba(255,255,255,.92); }
+  .ransom .word > span.c-pw { background: var(--sheen), rgba(255,61,143,.92); }
+  .ransom .word > span.c-ck { background: var(--sheen), rgba(92,200,255,.92); }
+  .ransom .word > span.c-rw { background: var(--sheen), rgba(255,59,92,.92); }
+  .ransom .word > span.c-ky { background: var(--sheen), rgba(125,92,255,.92); }
+  .ransom .word > span.c-wr { background: var(--sheen), rgba(255,255,255,.92); }
   .toast { background: rgba(27,22,38,.94); }
 }
