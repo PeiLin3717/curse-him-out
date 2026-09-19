@@ -6,8 +6,12 @@
   <meta name="theme-color" content="#f6f3fb" />
   <title>Curse Him Out 🔥 — Vent it. Burn it. Forget him.</title>
   <meta name="description" content="Therapy is expensive. This is free. Vent about your worst dates and exes, then burn it to the ground." />
-  <!-- flags that JS is running, so styles.css only hides reveal-on-scroll elements when motion.js can show them again -->
-  <script>document.documentElement.classList.add("js");</script>
+  <!-- flags that JS is running, so styles.css only hides reveal-on-scroll elements when motion.js can show them again.
+       If motion.js never arrives (blocked, dropped connection), take the flag back so nothing stays hidden. -->
+  <script>
+    document.documentElement.classList.add("js");
+    setTimeout(function () { if (!window.CHO_MOTION) document.documentElement.classList.remove("js"); }, 4000);
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
@@ -112,7 +116,7 @@
 
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script src="motion.js"></script>
+  <script src="motion.js" onerror="document.documentElement.classList.remove('js')"></script>
   <script src="script.js"></script>
 </body>
 </html>

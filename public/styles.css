@@ -42,6 +42,8 @@
   --spring: cubic-bezier(.2, .9, .3, 1.35);
   --ease-out: cubic-bezier(.22, 1, .36, 1);      /* long, soft landing */
   --pop: cubic-bezier(.2, .9, .3, 1.12);         /* a hint of overshoot */
+  --rise: 32px;                                  /* how far a glass panel floats up (motion.js reads this) */
+  --tile-step: 35ms;                             /* gap between title tiles (motion.js reads this) */
 
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
 }
@@ -166,9 +168,10 @@ body {
   pointer-events: none;
 }
 
-/* start states */
-html.js [data-reveal]:not(.in) { opacity: 0; }
-html.js [data-reveal="float"]:not(.in) { opacity: 1; translate: 0 32px; }
+/* start states — invisible things can't be tapped either (they still
+   exist for screen readers and the keyboard; motion.js reveals on focus) */
+html.js [data-reveal]:not(.in) { opacity: 0; pointer-events: none; }
+html.js [data-reveal="float"]:not(.in) { opacity: 1; pointer-events: auto; translate: 0 var(--rise); }
 html.js [data-reveal="letters"]:not(.in) { opacity: 1; }
 html.js [data-reveal="letters"]:not(.in) .word > span { opacity: 0; }
 
@@ -188,8 +191,8 @@ html.js [data-reveal="letters"]:not(.in) .word > span { opacity: 0; }
 }
 [data-reveal="letters"].in { animation: none; }
 [data-reveal="letters"].in .word > span {
-  animation: reveal-tile .8s var(--pop) both;
-  animation-delay: calc(var(--d, 0ms) + var(--i, 0) * 45ms);
+  animation: reveal-tile .65s var(--pop) both;
+  animation-delay: calc(var(--d, 0ms) + var(--i, 0) * var(--tile-step));
 }
 /* once played (or skipped past), drop the animation so a later cascade change
    (rage level leaving 5, bingo un-winning) can't make it replay */
@@ -206,7 +209,7 @@ html.js [data-reveal="letters"]:not(.in) .word > span { opacity: 0; }
   to   { opacity: 1; translate: 0 0;    scale: 1; }
 }
 @keyframes reveal-float {
-  from { translate: 0 32px; }
+  from { translate: 0 var(--rise); }
   to   { translate: 0 0; }
 }
 @keyframes reveal-tile {
@@ -258,8 +261,8 @@ html.js [data-reveal="letters"]:not(.in) .word > span { opacity: 0; }
   text-align: center;
   padding: clamp(6rem, 14vw, 8.5rem) 1rem 3rem;
 }
-/* motion.js nudges the hero down as you scroll so it lags behind the page
-   and slides under the frosted vent panel; give it its own layer for that */
+/* motion.js nudges the hero down as you scroll (it moves at 90% of scroll
+   speed) so it trails the page a little; give it its own layer for that */
 html.js .hero { will-change: transform; }
 
 .hero__kicker {
@@ -915,6 +918,8 @@ section {
   html.js [data-reveal="letters"]:not(.in) .word > span { opacity: 1; translate: none; }
   [data-reveal].in,
   [data-reveal="letters"].in .word > span { animation: none; }
+  /* parallax offsets are inline styles from motion.js: undo them on paper */
+  .hero, .blob { translate: none !important; }
 }
 
 /* browsers without backdrop-filter: make the glass a little more solid */
