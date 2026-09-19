@@ -94,10 +94,11 @@ git push -u origin main
 | `GET`  | `/api/curses?limit=40` | Recent curses (newest first) |
 | `POST` | `/api/curses` | Add one — body: `{ "text": "...", "level": 1-5, "crimes": ["..."] }` |
 | `GET`  | `/api/stats` | `{ "count": <base + total> }` for the live counter |
-| `GET`  | `/api/health` | `{ "ok": true }` |
+| `GET`  | `/api/health` | Always `200`: `{ "ok": true, "db": true/false, "lastDbError": null/"...", "uptime": <seconds> }` |
 
 ## Good to know / future
 - **Spam guard:** max 10 new curses per minute per IP.
 - **Safety:** swearing is the point; the footer asks people to keep it anonymous (no real names). Automated moderation isn't built yet — a good next step if it goes viral.
 - **Counter:** starts at `COUNT_BASE` (12,000) plus the real number of curses.
+- **Sleepy database:** Aiven's free MySQL powers itself off after a quiet spell, so the server no longer waits on (or dies with) the DB — it starts serving the frontend right away and retries the connection in the background, backing off from 5 s up to 60 s between attempts. While the DB is down, `/api/curses` and `/api/stats` answer `503 {"error":"db_unavailable"}` (with `Retry-After: 30`) and the frontend quietly switches to its browser-only offline mode; the wall goes shared again on its own once the DB wakes up. `/api/health` always returns `200` so Render keeps the instance alive, and its `db`, `lastDbError` and `uptime` fields tell you what's actually going on.
 - **Ideas:** likes/🔥 reactions, report button, "burn of the day," custom domain.
