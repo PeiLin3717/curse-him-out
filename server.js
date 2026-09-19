@@ -33,10 +33,12 @@ function safeParse(s) { try { return JSON.parse(s) || []; } catch (_) { return [
 // away and keep retrying the DB in the background (5 s, 10 s, 20 s … capped at 60 s).
 const DB_RETRY_MIN = 5 * 1000;
 const DB_RETRY_MAX = 60 * 1000;
+const DB_WAIT_MAX = 8 * 1000;  // longest a request may wait on the very first connect attempt
 let dbReady = false;
-let lastDbError = null;
+let lastDbError = null;       // error *code* only (ENOTFOUND, ETIMEDOUT …); it is public via /api/health
 let dbRetryTimer = null;      // pending retry (non-null while a retry is scheduled)
 let dbConnecting = false;     // an initDb() attempt is in flight right now
+let dbAttempt = null;         // promise of that in-flight attempt (settles, never rejects)
 let dbRetryDelay = DB_RETRY_MIN;
 
 // Try to reach + set up the DB. Only one attempt/retry loop runs at a time, so
@@ -44,7 +46,7 @@ let dbRetryDelay = DB_RETRY_MIN;
 function connectDb() {
   if (dbConnecting || dbRetryTimer) return;
   dbConnecting = true;
-  initDb()
+  dbAttempt = initDb()
     .then(() => {
       dbReady = true;
       lastDbError = null;
@@ -53,8 +55,9 @@ function connectDb() {
     })
     .catch((err) => {
       dbReady = false;
-      lastDbError = (err && err.message) || String(err);
-      console.warn(`⚠️  Database unavailable (${lastDbError}) — retrying in ${dbRetryDelay / 1000}s`);
+      // Publish only the code: the full message can name the DB host, port, user and our IP.
+      lastDbError = (err && err.code) || "unknown";
+      console.warn(`⚠️  Database unavailable (${(err && err.message) || String(err)}) — retrying in ${dbRetryDelay / 1000}s`);
       dbRetryTimer = setTimeout(() => { dbRetryTimer = null; connectDb(); }, dbRetryDelay);
       dbRetryDelay = Math.min(dbRetryDelay * 2, DB_RETRY_MAX);
     })
@@ -75,10 +78,24 @@ function sendDbUnavailable(res) {
   res.status(503).json({ error: "db_unavailable" });
 }
 
-// Gate for the data routes: while the DB is down, answer 503 immediately. The
-// frontend treats any non-OK response as "offline" and falls back to localStorage.
+// Gate for the data routes. While the DB is known to be down, answer 503 right
+// away — the frontend treats any non-OK response as "offline" and falls back to
+// localStorage. But right after a cold start (Render wakes the instance for the
+// very visitor whose page is about to call /api/*) the first initDb() is still in
+// flight and nothing has failed yet: give it a bounded moment instead of pushing
+// that visitor into offline mode while the DB is perfectly healthy.
 function requireDb(req, res, next) {
   if (dbReady) return next();
+  if (dbConnecting && lastDbError === null && dbAttempt) {
+    let timer;
+    const timeout = new Promise((resolve) => { timer = setTimeout(resolve, DB_WAIT_MAX); });
+    Promise.race([dbAttempt, timeout]).then(() => {
+      clearTimeout(timer);
+      if (dbReady) return next();
+      sendDbUnavailable(res);
+    });
+    return;
+  }
   sendDbUnavailable(res);
 }
 
@@ -87,7 +104,7 @@ function requireDb(req, res, next) {
 function sendRouteError(res, e) {
   if (isDbConnError(e)) {
     dbReady = false;
-    lastDbError = e.message;
+    lastDbError = e.code || "unknown";
     connectDb();
     return sendDbUnavailable(res);
   }
@@ -153,7 +170,8 @@ app.get("/api/stats", requireDb, async (req, res) => {
 });
 
 // Always 200, even with the DB down — Render's health check must keep the
-// instance (and the static frontend) alive. `db` tells you the real story.
+// instance (and the static frontend) alive. `db` tells you the real story;
+// `lastDbError` is only the error code (the full text stays in the server log).
 app.get("/api/health", (req, res) =>
   res.json({ ok: true, db: dbReady, lastDbError, uptime: Math.round(process.uptime()) })
 );

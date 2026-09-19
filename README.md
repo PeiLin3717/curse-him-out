@@ -94,11 +94,23 @@ git push -u origin main
 | `GET`  | `/api/curses?limit=40` | Recent curses (newest first) |
 | `POST` | `/api/curses` | Add one — body: `{ "text": "...", "level": 1-5, "crimes": ["..."] }` |
 | `GET`  | `/api/stats` | `{ "count": <base + total> }` for the live counter |
-| `GET`  | `/api/health` | Always `200`: `{ "ok": true, "db": true/false, "lastDbError": null/"...", "uptime": <seconds> }` |
+| `GET`  | `/api/health` | Always `200`: `{ "ok": true, "db": true/false, "lastDbError": null/"ENOTFOUND", "uptime": <seconds> }` — `lastDbError` is just the error code |
 
 ## Good to know / future
 - **Spam guard:** max 10 new curses per minute per IP.
 - **Safety:** swearing is the point; the footer asks people to keep it anonymous (no real names). Automated moderation isn't built yet — a good next step if it goes viral.
 - **Counter:** starts at `COUNT_BASE` (12,000) plus the real number of curses.
-- **Sleepy database:** Aiven's free MySQL powers itself off after a quiet spell, so the server no longer waits on (or dies with) the DB — it starts serving the frontend right away and retries the connection in the background, backing off from 5 s up to 60 s between attempts. While the DB is down, `/api/curses` and `/api/stats` answer `503 {"error":"db_unavailable"}` (with `Retry-After: 30`) and the frontend quietly switches to its browser-only offline mode; the wall goes shared again on its own once the DB wakes up. `/api/health` always returns `200` so Render keeps the instance alive, and its `db`, `lastDbError` and `uptime` fields tell you what's actually going on.
+- **Sleepy database:** Aiven's free MySQL powers itself off after a quiet spell, so the server no longer waits on (or dies with) the DB — it starts serving the frontend right away and retries the connection in the background, backing off from 5 s up to 60 s between attempts. While the DB is down, `/api/curses` and `/api/stats` answer `503 {"error":"db_unavailable"}` (with `Retry-After: 30`) and the frontend quietly switches to its browser-only offline mode; the next page load shows the shared wall again once the DB wakes up. Right after a cold start the first API calls wait up to 8 s for the initial connection, so the visitor who woke the instance still gets the shared wall. `/api/health` always returns `200` so Render keeps the instance alive, and its `db`, `lastDbError` (an error code such as `ENOTFOUND` or `ETIMEDOUT` — never the full message, which could reveal the DB host or user) and `uptime` fields tell you what's actually going on.
 - **Ideas:** likes/🔥 reactions, report button, "burn of the day," custom domain.
+
+---
+
+## Working in the cloud (no laptop setup)
+You don't need Node or MySQL on your own machine — GitHub builds and tests everything.
+
+- **The code lives on GitHub.** Every push to `main` auto-deploys on Render in about a minute.
+- **CI on every push and PR** (`.github/workflows/ci.yml`): installs dependencies, boots the server against a throwaway MySQL and smoke-tests the API and the homepage. A second job confirms the site still starts when the database is unreachable (the fix for the months-long outage).
+- **Keep-alive** (`.github/workflows/keepalive.yml`): pings `https://cursehimout.com/api/stats` every 10 minutes so Render stays awake and the Aiven free DB isn't auto-paused. GitHub disables this schedule after 60 days without repository activity — if that happens, re-enable it under **Actions → keepalive → Enable workflow** (or `gh workflow enable keepalive.yml`); a commit alone does not turn it back on.
+- **Work from any machine:** open this repo in Claude Code on the web (claude.ai/code) or github.dev (press `.` on the repo page), make the change on a branch, open a PR, wait for the green **ci** check, then merge — Render deploys it.
+- **Check health:** `curl https://cursehimout.com/api/health` — `"db": true` means the database is reachable; `false` means the wall is in browser-only mode (most likely the Aiven DB was powered off — turn it back on in the Aiven console).
+- **Something red?** Open the repo's **Actions** tab; a failed CI step prints `server.log` right there.
