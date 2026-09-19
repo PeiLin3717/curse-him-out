@@ -143,6 +143,7 @@
     const b = document.createElement("button");
     b.className = "crime";
     b.type = "button";
+    b.dataset.reveal = "pop"; // motion.js pops the chips in one by one
     b.textContent = c.label;
     b.addEventListener("click", () => toggleCrime(b, c.phrase));
     crimeGrid.appendChild(b);
@@ -224,6 +225,7 @@
   function noteNode(entry, fresh) {
     const div = document.createElement("div");
     div.className = "note glass-inner" + (fresh ? " fresh" : "");
+    if (!fresh) div.dataset.reveal = "pop"; // fresh notes have their own drop-in
     const p = document.createElement("p");
     p.textContent = "“" + entry.text + "”";
     p.style.margin = "0";
@@ -354,6 +356,7 @@
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "bingo-cell" + (idx === 12 ? " free marked" : "");
+    cell.dataset.reveal = "pop";
     cell.textContent = f;
     cell.addEventListener("click", () => {
       if (idx === 12) return;

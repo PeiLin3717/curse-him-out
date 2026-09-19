@@ -2,7 +2,7 @@
 
 A cathartic venting wall. Type what they did, set your rage level, and **burn it** — your curse joins a shared public Wall of Shame. _Vent it. Burn it. Forget him._
 
-- **Frontend:** static HTML/CSS/JS (in `public/`)
+- **Frontend:** static HTML/CSS/JS (in `public/`; `motion.js` does the scroll animations and steps aside for reduced-motion)
 - **Backend:** Node.js + Express (`server.js`)
 - **Database:** MySQL (`db.js`)
 
