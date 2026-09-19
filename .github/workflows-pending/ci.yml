@@ -1,0 +1,217 @@
+# ci: builds and smoke-tests the app entirely on GitHub's runners, so the owner
+# never needs Node or MySQL installed locally. Runs on every push and PR.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR cancels the run that is still going.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Boot the real server against a throwaway MySQL and exercise the API + homepage.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci
+          MYSQL_DATABASE: defaultdb
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Syntax check
+        run: |
+          set -euo pipefail
+          node --check server.js && node --check db.js
+
+      - name: Start server (background)
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: "3306"
+          DB_USER: root
+          DB_PASSWORD: ci
+          DB_NAME: defaultdb
+          DB_SSL: "false"
+          PORT: "3000"
+          COUNT_BASE: "12000"
+        run: |
+          set -euo pipefail
+          node server.js > server.log 2>&1 &
+          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
+          echo "Server started (pid $!)"
+
+      - name: Wait for /api/health (up to 60 s)
+        run: |
+          set -euo pipefail
+          code=""
+          for i in $(seq 1 30); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "::error::Server process exited early"
+              exit 1
+            fi
+            code=$(curl -s -o "$RUNNER_TEMP/health.json" -w '%{http_code}' http://localhost:3000/api/health || true)
+            # New server.js reports {"ok":true,"db":true|false}; the old one has no "db"
+            # field, so a plain 200 counts as ready there.
+            if [ "$code" = "200" ] && jq -e 'if has("db") then .db == true else true end' "$RUNNER_TEMP/health.json" >/dev/null; then
+              echo "Ready after ~$((i * 2)) s: $(cat "$RUNNER_TEMP/health.json")"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Server not ready within 60 s (last HTTP status: '$code')"
+          exit 1
+
+      - name: Smoke-test the API and the homepage
+        run: |
+          set -euo pipefail
+          base=http://localhost:3000
+          fail() { echo "::error::$*"; exit 1; }
+
+          echo "GET /api/stats -> count == 12008 (COUNT_BASE 12000 + 8 seeded rows)"
+          curl -fsS "$base/api/stats" | tee "$RUNNER_TEMP/stats.json"; echo
+          jq -e '.count == 12008' "$RUNNER_TEMP/stats.json" >/dev/null || fail "unexpected /api/stats body"
+
+          echo "POST /api/curses -> 201 with numeric id"
+          code=$(curl -sS -o "$RUNNER_TEMP/post.json" -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' \
+            -d '{"text":"ci smoke test","level":4,"crimes":["ghosted"]}' \
+            "$base/api/curses")
+          cat "$RUNNER_TEMP/post.json"; echo
+          [ "$code" = "201" ] || fail "POST /api/curses returned HTTP $code, expected 201"
+          jq -e '.id | type == "number"' "$RUNNER_TEMP/post.json" >/dev/null || fail "POST /api/curses: .id is not a number"
+
+          echo "GET /api/curses?limit=1 -> newest curse is the one we just posted"
+          curl -fsS "$base/api/curses?limit=1" | tee "$RUNNER_TEMP/curses.json"; echo
+          jq -e '.[0].text == "ci smoke test" and .[0].crimes == ["ghosted"]' "$RUNNER_TEMP/curses.json" >/dev/null \
+            || fail "GET /api/curses?limit=1: unexpected newest row"
+
+          echo "GET / -> 200 and the page mentions 'Curse Him Out'"
+          code=$(curl -sS -o "$RUNNER_TEMP/index.html" -w '%{http_code}' "$base/")
+          [ "$code" = "200" ] || fail "GET / returned HTTP $code, expected 200"
+          grep -q "Curse Him Out" "$RUNNER_TEMP/index.html" || fail "GET /: body does not contain 'Curse Him Out'"
+
+          echo "All smoke checks passed."
+
+      - name: Server log (on failure)
+        if: failure()
+        run: |
+          echo "--- server.log ---"
+          cat server.log 2>/dev/null || echo "(no server.log)"
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null || true; fi
+
+  # Tests the resilience fix: the site must come up (and serve the static frontend)
+  # even when the database is unreachable, answering 503 on DB-backed routes.
+  # This job FAILS against the pre-fix server.js, which exits when the DB is down.
+  # That is intended.
+  starts-without-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Start server with an unreachable DB (background)
+        env:
+          DB_HOST: db.invalid
+          DB_PORT: "3306"
+          DB_USER: x
+          DB_PASSWORD: x
+          DB_NAME: x
+          DB_SSL: "false"
+          PORT: "3000"
+        run: |
+          set -euo pipefail
+          node server.js > server.log 2>&1 &
+          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
+          echo "Server started (pid $!)"
+
+      - name: Wait for /api/health to report db == false (up to 30 s)
+        run: |
+          set -euo pipefail
+          code=""
+          for i in $(seq 1 15); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "::error::Server process exited instead of starting without the DB (pre-fix behaviour)"
+              exit 1
+            fi
+            code=$(curl -s -o "$RUNNER_TEMP/health.json" -w '%{http_code}' http://localhost:3000/api/health || true)
+            if [ "$code" = "200" ] && jq -e '.db == false' "$RUNNER_TEMP/health.json" >/dev/null; then
+              echo "Up without DB after ~$((i * 2)) s: $(cat "$RUNNER_TEMP/health.json")"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::/api/health did not return 200 with db == false within 30 s (last HTTP status: '$code')"
+          exit 1
+
+      - name: DB-backed route degrades to 503, static frontend still serves
+        run: |
+          set -euo pipefail
+          base=http://localhost:3000
+          fail() { echo "::error::$*"; exit 1; }
+
+          echo "GET /api/stats -> 503 while the DB is down"
+          code=$(curl -sS -o "$RUNNER_TEMP/stats.json" -w '%{http_code}' "$base/api/stats")
+          cat "$RUNNER_TEMP/stats.json"; echo
+          [ "$code" = "503" ] || fail "GET /api/stats returned HTTP $code, expected 503"
+
+          echo "GET / -> 200 (frontend works offline)"
+          code=$(curl -sS -o "$RUNNER_TEMP/index.html" -w '%{http_code}' "$base/")
+          [ "$code" = "200" ] || fail "GET / returned HTTP $code, expected 200"
+
+          echo "Resilience checks passed."
+
+      - name: Server log (on failure)
+        if: failure()
+        run: |
+          echo "--- server.log ---"
+          cat server.log 2>/dev/null || echo "(no server.log)"
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null || true; fi

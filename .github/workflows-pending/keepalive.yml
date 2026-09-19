@@ -1,0 +1,31 @@
+# keepalive: hits the live site every 10 minutes so Render's free instance stays
+# awake and the Aiven free MySQL keeps seeing queries (Aiven auto-pauses an idle
+# free DB, which took the whole site down for months). Two GitHub gotchas: cron
+# runs can be delayed by several minutes, and GitHub disables scheduled workflows
+# in a public repo after 60 days with no repository activity. If that happens,
+# re-enable it under Actions -> keepalive -> "Enable workflow" (or
+# `gh workflow enable keepalive.yml`); a commit alone does NOT turn it back on.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    # Worst case below is 3 x 90 s + 2 x 20 s = 310 s, so 5 min would cut curl off
+    # before it can print its error.
+    timeout-minutes: 7
+    steps:
+      - name: Ping /api/stats (touches the DB, not just the web server)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Render's free instance takes ~50 s to wake up, hence the long --max-time.
+          curl -fsS --max-time 90 --retry 2 --retry-delay 20 https://cursehimout.com/api/stats
+          echo
