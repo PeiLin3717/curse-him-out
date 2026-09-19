@@ -6,12 +6,21 @@
   <meta name="theme-color" content="#f6f3fb" />
   <title>Curse Him Out 🔥 — Vent it. Burn it. Forget him.</title>
   <meta name="description" content="Therapy is expensive. This is free. Vent about your worst dates and exes, then burn it to the ground." />
+  <!-- flags that JS is running, so styles.css only hides reveal-on-scroll elements when motion.js can show them again.
+       If motion.js never arrives (blocked, dropped connection), take the flag back so nothing stays hidden. -->
+  <script>
+    document.documentElement.classList.add("js");
+    setTimeout(function () { if (!window.CHO_MOTION) document.documentElement.classList.remove("js"); }, 4000);
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- thin bar along the top edge that fills as you scroll -->
+  <div class="progress" id="progress" aria-hidden="true"></div>
+
   <!-- the liquid: soft color drifting behind the glass -->
   <div class="bg" aria-hidden="true">
     <span class="blob b1"></span>
@@ -30,27 +39,27 @@
   </nav>
 
   <header class="hero" id="top">
-    <p class="hero__kicker glass">★ the official ★</p>
-    <h1 class="ransom" aria-label="Curse Him Out">
+    <p class="hero__kicker glass" data-reveal>★ the official ★</p>
+    <h1 class="ransom" aria-label="Curse Him Out" data-reveal="letters">
       <span class="word"><span class="f-anton c-kw">C</span><span class="f-archivo c-yk">U</span><span class="f-elite c-wk">R</span><span class="f-marker c-pw">S</span><span class="f-anton c-ck">E</span></span>
       <span class="word"><span class="f-caveat c-wr">H</span><span class="f-archivo c-ky">I</span><span class="f-anton c-rw">M</span></span>
       <span class="word"><span class="f-marker c-yk">O</span><span class="f-elite c-wk">U</span><span class="f-anton c-kw">T</span></span>
     </h1>
-    <p class="hero__tag">Therapy is expensive. <span>This is free.</span></p>
-    <p class="hero__sub">For every man who failed his date, fumbled the bag, or fumbled <em>you</em>.<br/><small>(…or her, or them — whoever wrecked your heart.)</small></p>
-    <a class="btn btn--big" href="#vent">Start cursing →</a>
-    <p class="counter glass"><span id="count">0</span> men cursed out 🔥</p>
+    <p class="hero__tag" data-reveal>Therapy is expensive. <span>This is free.</span></p>
+    <p class="hero__sub" data-reveal>For every man who failed his date, fumbled the bag, or fumbled <em>you</em>.<br/><small>(…or her, or them — whoever wrecked your heart.)</small></p>
+    <a class="btn btn--big" href="#vent" data-reveal>Start cursing →</a>
+    <p class="counter glass" data-reveal><span id="count">0</span> men cursed out 🔥</p>
   </header>
 
   <main>
     <!-- VENT BOX -->
-    <section class="vent glass" id="vent">
-      <h2 class="tape-head">Let it out. 💅</h2>
-      <div class="vent__box glass" id="ventBox" data-level="3">
+    <section class="vent glass" id="vent" data-reveal="float">
+      <h2 class="tape-head" data-reveal>Let it out. 💅</h2>
+      <div class="vent__box glass" id="ventBox" data-level="3" data-reveal>
         <textarea id="ventText" placeholder="He said he'd text back. It's been 6 weeks…"></textarea>
         <div class="vent__ash" id="ash" aria-hidden="true"></div>
       </div>
-      <div class="vent__controls">
+      <div class="vent__controls" data-reveal>
         <div class="slider">
           <label for="intensity">Rage level: <strong id="intensityLabel">Heated</strong></label>
           <input type="range" id="intensity" min="1" max="5" value="3" />
@@ -59,38 +68,38 @@
           <input type="checkbox" id="censor" /> Censor-o-matic <span class="switch__sym">#@$%!</span>
         </label>
       </div>
-      <button class="btn btn--burn" id="burnBtn">🔥 Burn it to the ground</button>
+      <button class="btn btn--burn" id="burnBtn" data-reveal>🔥 Burn it to the ground</button>
     </section>
 
     <!-- CRIME CARDS -->
-    <section class="crimes glass" id="crimes">
-      <h2 class="tape-head pink">What'd he do? 🚩</h2>
-      <p class="section-sub">Tap his crimes — we'll add them to your rant.</p>
+    <section class="crimes glass" id="crimes" data-reveal="float">
+      <h2 class="tape-head pink" data-reveal>What'd he do? 🚩</h2>
+      <p class="section-sub" data-reveal>Tap his crimes — we'll add them to your rant.</p>
       <div class="crime-grid" id="crimeGrid"></div>
     </section>
 
     <!-- WALL OF SHAME -->
-    <section class="wall glass" id="wall">
-      <h2 class="tape-head">The Wall of Shame</h2>
-      <p class="section-sub">Anonymous. No names. Just receipts.</p>
+    <section class="wall glass" id="wall" data-reveal="float">
+      <h2 class="tape-head" data-reveal>The Wall of Shame</h2>
+      <p class="section-sub" data-reveal>Anonymous. No names. Just receipts.</p>
       <div class="wall-grid" id="wallGrid"></div>
     </section>
 
     <!-- TOYS -->
-    <section class="toys glass" id="toys">
-      <h2 class="tape-head pink">Petty playground</h2>
+    <section class="toys glass" id="toys" data-reveal="float">
+      <h2 class="tape-head pink" data-reveal>Petty playground</h2>
       <div class="toys-grid">
         <div class="toy glass-inner">
-          <h3>Curse Generator</h3>
-          <p class="gen-out" id="genOut">Hit the button. Receive ammo.</p>
+          <h3 data-reveal>Curse Generator</h3>
+          <p class="gen-out" id="genOut" data-reveal>Hit the button. Receive ammo.</p>
           <div class="toy-actions">
-            <button class="btn" id="genBtn">Generate 💢</button>
-            <button class="btn btn--ghost" id="copyBtn">Copy</button>
+            <button class="btn" id="genBtn" data-reveal>Generate 💢</button>
+            <button class="btn btn--ghost" id="copyBtn" data-reveal>Copy</button>
           </div>
         </div>
         <div class="toy glass-inner">
-          <h3>Red-Flag Bingo</h3>
-          <p class="section-sub small">Tap every flag he waved. 5 in a row = RUN.</p>
+          <h3 data-reveal>Red-Flag Bingo</h3>
+          <p class="section-sub small" data-reveal>Tap every flag he waved. 5 in a row = RUN.</p>
           <div class="bingo-grid" id="bingoGrid"></div>
           <p class="bingo-msg" id="bingoMsg"></p>
         </div>
@@ -98,15 +107,16 @@
     </section>
   </main>
 
-  <footer class="footer glass">
-    <p class="footer__big">Feeling better? 💋</p>
-    <p>This site is for laughs and letting off steam. Keep it anonymous — <strong>no real names, no addresses, no doxxing.</strong></p>
-    <p class="footer__safe">If you're actually in danger or in an abusive relationship, please talk to someone real. In the US: call or text <strong>988</strong>, or the National DV Hotline at <strong>1-800-799-7233</strong>.</p>
-    <p class="footer__tag">Curse Him Out — vent it, burn it, forget him.</p>
+  <footer class="footer glass" data-reveal="float">
+    <p class="footer__big" data-reveal>Feeling better? 💋</p>
+    <p data-reveal>This site is for laughs and letting off steam. Keep it anonymous — <strong>no real names, no addresses, no doxxing.</strong></p>
+    <p class="footer__safe" data-reveal>If you're actually in danger or in an abusive relationship, please talk to someone real. In the US: call or text <strong>988</strong>, or the National DV Hotline at <strong>1-800-799-7233</strong>.</p>
+    <p class="footer__tag" data-reveal>Curse Him Out — vent it, burn it, forget him.</p>
   </footer>
 
   <div class="toast" id="toast" aria-live="polite"></div>
 
+  <script src="motion.js" onerror="document.documentElement.classList.remove('js')"></script>
   <script src="script.js"></script>
 </body>
 </html>
