@@ -90,6 +90,10 @@
     "scumbag", "shit", "trash", "idiot", "moron", "creep",
   ];
   const SWEAR_RE = new RegExp("\\b(" + SWEARS.join("|") + ")\\b", "gi");
+  // Live-typing pass: only mask a swear once the character AFTER it has been
+  // typed, so "hell" in "hello" or "ass" in "assume" is never clobbered mid-word.
+  // SWEAR_RE (no lookahead) still runs at toggle-on and burn time.
+  const SWEAR_LIVE_RE = new RegExp("\\b(" + SWEARS.join("|") + ")\\b(?=\\W)", "gi");
   const SYMS = "#@$%&!*";
   function mask(word) {
     const n = Math.max(3, word.length);
@@ -102,9 +106,14 @@
   }
   function maybeCensorLive() {
     if (!censorToggle.checked) return;
+    const before = ventText.value;
+    const after = before.replace(SWEAR_LIVE_RE, (m) => mask(m));
+    if (after === before) return; // nothing to mask: leave value and caret alone
     const pos = ventText.selectionStart;
-    ventText.value = censor(ventText.value);
-    try { ventText.setSelectionRange(pos, pos); } catch (e) {}
+    ventText.value = after;
+    // Keep the caret where it was, shifted by any length change and clamped.
+    const newPos = Math.max(0, Math.min(after.length, pos + (after.length - before.length)));
+    try { ventText.setSelectionRange(newPos, newPos); } catch (e) {}
   }
   censorToggle.addEventListener("change", () => {
     if (censorToggle.checked) {
