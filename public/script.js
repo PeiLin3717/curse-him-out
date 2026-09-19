@@ -220,12 +220,10 @@
     { text: "Spent the whole dinner explaining crypto. I lost more than money.", lvl: 5 },
     { text: "Said he'd call. It's been 8 months. Still 'typing…'", lvl: 5 },
   ];
-  const NOTE_ROT = [-3, 2, -1.5, 3, -2.5, 1.5];
 
   function noteNode(entry, fresh) {
     const div = document.createElement("div");
-    div.className = "note" + (fresh ? " fresh" : "");
-    div.style.transform = "rotate(" + NOTE_ROT[Math.floor(Math.random() * NOTE_ROT.length)] + "deg)";
+    div.className = "note glass-inner" + (fresh ? " fresh" : "");
     const p = document.createElement("p");
     p.textContent = "“" + entry.text + "”";
     p.style.margin = "0";
@@ -380,5 +378,19 @@
       bingoGrid.classList.remove("win");
       bingoMsg.textContent = "";
     }
+  }
+
+  /* ---------- floating nav: light up the section in view ---------- */
+  const navLinks = [...document.querySelectorAll(".nav a[href^='#']")].filter((a) => a.hash !== "#top");
+  if ("IntersectionObserver" in window && navLinks.length) {
+    const byId = new Map(navLinks.map((a) => [a.hash.slice(1), a]));
+    const visible = new Map();
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => visible.set(en.target.id, en.intersectionRatio));
+      let bestId = null, best = 0;
+      visible.forEach((ratio, id) => { if (ratio > best) { best = ratio; bestId = id; } });
+      navLinks.forEach((a) => a.classList.toggle("active", a.hash.slice(1) === bestId));
+    }, { rootMargin: "-40% 0px -45% 0px", threshold: [0, .1, .25, .5, .75, 1] });
+    byId.forEach((_, id) => { const el = document.getElementById(id); if (el) io.observe(el); });
   }
 })();
